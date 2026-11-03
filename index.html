@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#fff0e8">
+<title>امشب چی بخوریم؟ 🍽️</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Tahoma,Arial,sans-serif;background:linear-gradient(145deg,#fff5e8,#ffe5e4);color:#442b27}
+main{max-width:1000px;margin:0 auto;padding:24px 16px 40px}
+header{text-align:center;padding:22px 12px}
+h1{font-size:clamp(27px,5vw,40px);margin:0 0 10px}
+header p{font-size:15px;line-height:1.9;margin:0;color:#79564e}
+.tools{display:flex;gap:10px;max-width:620px;margin:12px auto 20px;flex-wrap:wrap}
+input{flex:1;min-width:190px;padding:14px 16px;border:1px solid #efd4ca;border-radius:14px;font:inherit;background:#fff;color:#442b27;outline:none}
+input:focus{border-color:#e66d55;box-shadow:0 0 0 3px #e66d5522}
+.action{border:0;border-radius:14px;padding:13px 17px;font:inherit;cursor:pointer;background:#70483d;color:white}
+.action.alt{background:#fff;color:#70483d;border:1px solid #e8cfc5}
+.action:disabled{opacity:.55;cursor:wait}
+.count{text-align:center;color:#956f64;font-size:13px;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}
+button.food{border:2px solid transparent;border-radius:18px;background:#fff;padding:16px 10px;min-height:104px;font:inherit;font-size:14px;color:#442b27;box-shadow:0 5px 16px #6b352012;cursor:pointer;transition:.15s}
+button.food:hover{transform:translateY(-2px)}
+button.food.selected{border-color:#e66d55;background:#fff0e9;box-shadow:0 0 0 3px #e66d5522}
+.food .emoji{display:block;font-size:27px;margin-bottom:9px}
+#result{display:none;text-align:center;margin:22px auto 0;padding:20px;background:#fff;border-radius:18px;line-height:1.9;max-width:620px;box-shadow:0 5px 16px #6b352012}
+#result strong{color:#d4543d;font-size:21px}
+#status{text-align:center;max-width:620px;margin:16px auto;padding:12px 16px;background:#fff8f3;border:1px solid #efd4ca;border-radius:14px;line-height:1.9;font-size:14px}
+#savedChoice{font-weight:bold;color:#d4543d}
+footer{text-align:center;color:#956f64;font-size:12px;margin-top:24px}
+.empty{text-align:center;padding:30px;color:#956f64;display:none}
+@media(max-width:420px){.tools{flex-direction:column}.tools>*{width:100%}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}button.food{min-height:96px;padding:13px 8px;font-size:13px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>امشب چی بخوریم؟ 🍽️</h1>
+<p>پارتنرت از بین غذاها انتخاب می‌کند؛ انتخاب ذخیره‌شده را می‌توانی با گوشی خودت ببینی.<br>روی یکی از گزینه‌ها بزن 👇</p>
+</header>
+<div class="tools">
+<input id="search" type="search" placeholder="جست‌وجوی غذا..." aria-label="جست‌وجوی غذا">
+<button class="action" id="randomBtn" type="button">🎲 انتخاب شانسی</button>
+<button class="action" id="saveBtn" type="button" disabled>ذخیره انتخاب</button>
+<button class="action alt" id="refreshBtn" type="button">به‌روزرسانی انتخاب ذخیره‌شده</button>
+</div>
+<p class="count" id="count" aria-live="polite"></p>
+<section class="grid" id="foods" aria-label="فهرست غذاها"></section>
+<p class="empty" id="empty">غذایی با این نام پیدا نشد.</p>
+<section id="result" aria-live="polite">انتخاب فعلی پارتنرت: <strong id="chosen"></strong></section>
+<section id="status" aria-live="polite">در حال دریافت انتخاب ذخیره‌شده...</section>
+<footer>با عشق درست شده ❤️</footer>
+</main>
+<script>
+const foods = [
+"قیمه","فسنجون","خورشت کرفس","خورشت بامیه","قورمه‌سبزی","قیمه بادمجان","قیمه نثار",
+"زرشک‌پلو","باقالی‌پلو","عدس‌پلو","لوبیاپلو","ته‌چین","چلوگوشت","استانبولی","هویج‌پلو",
+"آش رشته","آش دوغ","آب‌دوغ‌خیار","کشک بادمجان","میرزا قاسمی","عدسی","خوراک لوبیا",
+"کتلت گوشت","کتلت مرغ","کوکو ذرت","سمبوسه پیتزایی","کباب تابه‌ای","کوفته‌ریزه گوشت",
+"کوفته‌ریزه مرغ","املت","شیر برنج","ماکارونی","پاستا","سالاد ماکارونی","لازانیا",
+"مرغ سوخاری","الویه","سوپ جو","سوپ رشته","سوپ شیر","سیب‌زمینی و تخم‌مرغ",
+"سوسیس و تخم‌مرغ","تن ماهی","خیارشور و گوجه","گوجه بندری","هات‌داگ","فلافل",
+"همبرگر","شامی کباب","آبگوشت"
+];
+const emojiFor = food => {
+ if(/آش|سوپ|خورشت|قیمه|قورمه|آبگوشت|فسنجون|کوفته/.test(food)) return "🍲";
+ if(/پلو|چلو|ته‌چین|استانبولی|ماکارونی|پاستا|لازانیا/.test(food)) return "🍚";
+ if(/مرغ|کتلت|کباب|همبرگر|هات‌داگ|شامی|سوسیس/.test(food)) return "🍗";
+ if(/بادمجان|میرزا|گوجه|خیارشور|سالاد|آب‌دوغ/.test(food)) return "🥗";
+ if(/املت|تخم‌مرغ|عدسی|لوبیا|تن ماهی/.test(food)) return "🍳";
+ if(/شیر برنج/.test(food)) return "🍮";
+ return "🍽️";
+};
+const grid=document.getElementById("foods");
+const search=document.getElementById("search");
+const result=document.getElementById("result");
+const chosen=document.getElementById("chosen");
+const count=document.getElementById("count");
+const statusBox=document.getElementById("status");
+const saveBtn=document.getElementById("saveBtn");
+let selected="";
+let saved="";
+
+function showStatus(message){ statusBox.textContent=message; }
+function render(){
+ const term=search.value.trim().toLocaleLowerCase("fa");
+ const filtered=foods.filter(food=>food.toLocaleLowerCase("fa").includes(term));
+ grid.innerHTML="";
+ filtered.forEach(food=>{
+  const b=document.createElement("button");
+  b.type="button"; b.className="food"+(food===selected?" selected":"");
+  const emoji=document.createElement("span"); emoji.className="emoji"; emoji.textContent=emojiFor(food);
+  b.append(emoji,document.createTextNode(food));
+  b.setAttribute("aria-pressed",food===selected?"true":"false");
+  b.addEventListener("click",()=>choose(food));
+  grid.appendChild(b);
+ });
+ count.textContent=`${filtered.length} غذا از ${foods.length} گزینه`;
+ document.getElementById("empty").style.display=filtered.length?"none":"block";
+}
+function choose(food){
+ selected=food; chosen.textContent=food; result.style.display="block";
+ saveBtn.disabled = selected===saved;
+ render();
+ result.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+async function loadSaved(){
+ try{
+  const response=await fetch("/.netlify/functions/dinner-choice",{cache:"no-store"});
+  if(!response.ok) throw new Error("دریافت اطلاعات ناموفق بود");
+  const data=await response.json();
+  saved=data.food||"";
+  if(saved && foods.includes(saved)){
+   selected=saved; chosen.textContent=saved; result.style.display="block";
+   showStatus(`انتخاب ذخیره‌شده پارتنرت: ${saved}`);
+  }else{
+   selected=""; result.style.display="none";
+   showStatus("هنوز انتخابی ذخیره نشده است.");
+  }
+  saveBtn.disabled=true;
+  render();
+ }catch(error){
+  showStatus("ارتباط با سرور برقرار نشد. بعد از انتشار نسخه جدید در Netlify دوباره امتحان کن.");
+ }
+}
+async function saveChoice(){
+ if(!foods.includes(selected)) return;
+ saveBtn.disabled=true;
+ showStatus("در حال ذخیره انتخاب...");
+ try{
+  const response=await fetch("/.netlify/functions/dinner-choice",{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({food:selected})
+  });
+  if(!response.ok) throw new Error("ذخیره ناموفق بود");
+  saved=selected;
+  showStatus(`انتخاب پارتنرت ذخیره شد: ${saved} ❤️`);
+ }catch(error){
+  showStatus("ذخیره انجام نشد. اتصال اینترنت و انتشار تابع Netlify را بررسی کن.");
+  saveBtn.disabled=false;
+ }
+}
+search.addEventListener("input",render);
+document.getElementById("randomBtn").addEventListener("click",()=>{
+ const options=foods.filter(food=>food.toLocaleLowerCase("fa").includes(search.value.trim().toLocaleLowerCase("fa")));
+ if(options.length) choose(options[Math.floor(Math.random()*options.length)]);
+});
+saveBtn.addEventListener("click",saveChoice);
+document.getElementById("refreshBtn").addEventListener("click",loadSaved);
+render();
+loadSaved();
+</script>
+</body>
+</html>
